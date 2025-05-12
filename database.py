@@ -174,6 +174,24 @@ def update_order(customer_id, order_id, item_id, new_product_name=None, new_quan
     except Exception as e:
         print(f"Error updating order: {e}")
         return False
+
+def add_item_to_order(order_id, product_name, quantity, price, product_id=None):
+    """Add new item to existing order"""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """INSERT INTO order_items (order_id, product_name, quantity, price, product_id)
+                   VALUES (%s, %s, %s, %s, %s)""",
+                (order_id, product_name, quantity, price, product_id)
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        print(f"Error adding item: {e}")
+        return False
+    finally:
+        conn.close()
     
 def update_customer_info(customer_id, field, value):
     """Update a customer's information"""
