@@ -3,7 +3,13 @@ import random
 import chainlit as cl
 from datetime import datetime, timedelta
 from database import get_customer_by_id, get_customer_orders, get_order_details, update_order, cancel_order
-from product_search import search_products
+
+import logging
+from product_search import product_retriever
+
+# Configure logger
+logger = logging.getLogger(__name__)
+
 
 # Function Definitions
 product_search_def = {
@@ -14,7 +20,7 @@ product_search_def = {
         "properties": {
             "query": {
                 "type": "string",
-                "description": "The product query from the customer (e.g., 'Do you have cheese?')"
+                "description": "The product query from the customer (e.g., 'Do you have cheese?', 'Show me organic milk', 'I need gluten-free bread')"
             }
         },
         "required": ["query"]
@@ -181,7 +187,6 @@ get_order_item_def = {
     }
 }
 
-
 update_order_item_def = {
     "name": "update_order_item",
     "description": "Update an item in a customer's order",
@@ -213,25 +218,41 @@ update_order_item_def = {
     }
 }
 
+# Keep your existing tools and just update the product search handler
 async def product_search_handler(query):
-    """Handler for the product_search function"""
-    # Search for products
-    results = search_products(query)
+    """Handler for the product_search function using LlamaIndex"""
+    try:
+        # Use the LlamaIndex retriever
+        results = product_retriever.search_products(query)
+        
+        if not results:
+            return "I'm sorry, I couldn't find any matching products in our inventory."
+        
+        # Format the results
+        response = f"I found {len(results)} products matching '{query}':\n\n"
+        
+        for i, product in enumerate(results, 1):
+            response += f"{i}. {product['product_name']}\n"
+            
+            if product['brand'] != "Unknown":
+                response += f"   Brand: {product['brand']}\n"
+            
+            if product['department'] != "Unknown":
+                response += f"   Department: {product['department']}\n"
+            
+            response += f"   Price: ${product['price']:.2f}\n"
+            
+            if product['size'] != "Unknown":
+                response += f"   Size: {product['size']}\n"
+            
+            response += f"   Match Score: {product['score']:.2f}\n\n"
+        
+        return response
+        
+    except Exception as e:
+        print(f"Error in product search handler: {e}")
+        return "I encountered an error while searching for products."
     
-    if not results:
-        return "I'm sorry, I couldn't find any matching products in our inventory."
-    
-    # Format the results
-    response = "Here are the products I found:\n\n"
-    for i, product in enumerate(results, 1):
-        response += f"{i}. {product['product_name']}\n"
-        response += f"   Category: {product['category']}\n"
-        response += f"   Brand: {product['brand']}\n"
-        response += f"   Price: ${product['price']}\n"
-        response += f"   Size: {product['size']}\n\n"
-    
-    return response
-  
 async def cancel_order_handler(customer_id, order_id, reason):
     """Handler for the cancel_order function"""
     success = cancel_order(customer_id, order_id)
@@ -349,7 +370,6 @@ async def update_account_info_handler(customer_id, field, value):
     else:
         return f"Failed to update {field} for customer {customer_id}. Please check if the customer exists and the field is valid."
 
-
 async def get_order_item_handler(item_id, order_id=None):
     """Handler for getting order item details"""
     from database import get_order_items
@@ -382,7 +402,8 @@ async def get_order_item_handler(item_id, order_id=None):
         })
     else:
         return f"No item found with ID {item_id}" + (f" in order {order_id}" if order_id else "")
-# Add this to the tools list
+
+# Tools list with all handlers
 tools = [
     (get_customer_info_def, get_customer_info_handler),
     (check_order_status_def, check_order_status_handler),
@@ -393,5 +414,5 @@ tools = [
     (schedule_callback_def, schedule_callback_handler),
     (update_order_item_def, update_order_item_handler),
     (get_order_item_def, get_order_item_handler), 
-    (product_search_def, product_search_handler)# Add this new tool
+    (product_search_def, product_search_handler)  # Product search tool
 ]

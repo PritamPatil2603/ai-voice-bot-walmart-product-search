@@ -7,7 +7,7 @@ psycopg2-binary
 python-dotenv
 tqdm
 gunicorn
-elasticsearch
+elasticsearch 
 llama-index
 llama-index-vector-stores-elasticsearch
 llama-index-embeddings-openai
